@@ -1,4 +1,6 @@
 # auto-selenium
+![PyPI version](https://img.shields.io/pypi/v/auto-selenium)
+
 Auto-Selenium is a Python tool to automate the download of Selenium Web Drivers and store the profile sessions for the following browsers:
 * Google Chrome
 * Firefox
