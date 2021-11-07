@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from sys import platform
 from pathlib import Path
 from jinja2 import Template

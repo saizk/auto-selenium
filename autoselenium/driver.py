@@ -1,7 +1,6 @@
-import os
+# -*- coding: utf-8 -*-
+
 import time
-import json
-import shutil
 from sys import platform
 from pathlib import Path
 
@@ -13,7 +12,6 @@ from selenium.common.exceptions import SessionNotCreatedException
 
 class Driver(object):
 
-    _LOCAL_STORAGE = 'cookies.json'
     _BRAVE_PATHS = {
         'win32': 'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe',
         'linux': '/opt/brave.com/brave/brave-browser',
@@ -22,12 +20,32 @@ class Driver(object):
     XPATH_SELECTORS = {}
     CSS_SELECTORS = {}
 
-    def __init__(self, browser: str, root: str = '.', driver_path: str = '',
-                 profile_path: str = '', brave_path: str = '',
-                 headless: bool = False, kiosk: bool = False,
-                 proxy: str = None, command_executor: str = None):
+    def __init__(self,
+                 browser: str,
+                 root: str = '.',
+                 driver_path=None,
+                 profile_path=None,
+                 driver_options=None,
+                 brave_path=None,
+                 headless=False,
+                 kiosk=False,
+                 proxy=None,
+                 command_executor=None):
+        """
+        :param (str) browser: Driver browser (i.e. 'chrome', 'firefox', 'edge', 'brave', 'opera').
+        :param (str) root: Root path for the driver executable and profiles.
+        :param (str) driver_path: Path for an existing driver. If empty it will search for the driver based on its name.
+        :param (str) profile_path: Path for an existing profile. If empty it will create one new.
+        :param (selenium.webdriver.browser.options) driver_options: Custom Selenium Options for the driver.
+        :param (str) brave_path: Path for a custom installation path of Brave Browser.
+        :param (bool) headless: Activate headless mode
+        :param (bool) kiosk: Activate kiosk mode (does not work on Opera)
+        :param (str) proxy: Set a proxy (format -> 'proxy:port')
+        :param (str) command_executor: Command executor for remote Selenium driver.
+        """
 
         self.browser = browser.lower()
+        self.options = driver_options
         self.headless = headless
         self.kiosk = kiosk
 
@@ -49,11 +67,11 @@ class Driver(object):
         else:
             self.brave_path = Path(brave_path).absolute()
 
-        self._cookies_path = Path(f'{self.profile_path}/{self._LOCAL_STORAGE}')
-
         try:
-            self.options = self._create_options()
-            self.driver = self._create_selenium_driver()
+            if driver_options is None:
+                self.options = self._create_options()
+
+            self.driver = self._create_selenium_driver(self.options)
 
         except OSError as e:
             raise RuntimeError(f'Incorrect executable path for {self.browser} driver: {e}')
@@ -72,29 +90,24 @@ class Driver(object):
         return search_driver(driver, root=root)
 
     def __enter__(self):
-        if self.browser == 'firefox':
-            self._load_profile()
         return self.driver
 
     def __exit__(self, *args):
-        if self.browser == 'firefox':
-            self._save_profile()
-        self._save_local_storage()
         return self.quit()
 
-    def _create_selenium_driver(self):
+    def _create_selenium_driver(self, options):
 
         if self.command_executor:  # remote driver
-            driver = Remote(command_executor=self.command_executor, options=self.options)
+            driver = Remote(command_executor=self.command_executor, options=options)
 
         elif self.browser in ['chrome', 'brave']:
-            driver = Chrome(executable_path=self.driver_path, options=self.options)
+            driver = Chrome(executable_path=self.driver_path, options=options)
 
         elif self.browser == 'opera':
-            driver = Opera(executable_path=self.driver_path, options=self.options)
+            driver = Opera(executable_path=self.driver_path, options=options)
 
         elif self.browser == 'edge':
-            driver = Edge(executable_path=self.driver_path, options=self.options)
+            driver = Edge(executable_path=self.driver_path, options=options)
 
         elif self.browser == 'firefox':
             from selenium.webdriver.firefox.options import FirefoxProfile
@@ -106,7 +119,7 @@ class Driver(object):
 
             driver = Firefox(
                 executable_path=self.driver_path,
-                options=self.options,
+                options=options,
                 firefox_profile=profile,
                 service_log_path=Path(f'{self.driver_path.parent}/geckodriver.log')
             )
@@ -168,47 +181,6 @@ class Driver(object):
         options.set_preference('network.proxy.ssl_port', int(proxy_port))
         return options
 
-    def _load_profile(self):
-        local_storage_file = os.path.join(self.driver.profile.path, self._cookies_path)
-        if Path(local_storage_file).exists():
-            with open(local_storage_file) as f:
-                data = json.loads(f.read())
-                self.driver.execute_script(''.join(
-                    [f'window.localStorage.setItem(\'{k}\', \'{v}\'); '
-                     for k, v in data.items()])
-                )
-            self.refresh()
-
-    def _save_profile(self, remove_old=False):
-        if self.profile_path.exists():
-            return
-        driver_profile, local_path = self.driver.profile.path, self.profile_path
-        ignore_rule = shutil.ignore_patterns('parent.lock', 'lock', '.parentlock')
-        os.mkdir(local_path)
-        if remove_old:
-            try:
-                shutil.rmtree(local_path)
-            except OSError:
-                pass
-            shutil.copytree(
-                src=os.path.join(driver_profile), dst=local_path,
-                ignore=ignore_rule,
-            )
-        else:
-            for item in os.listdir(driver_profile):
-                if item in ['parent.lock', 'lock', '.parentlock']:
-                    continue
-                src, dst = os.path.join(driver_profile, item), local_path
-                if os.path.isdir(src):
-                    shutil.copytree(src=src, dst=dst,
-                                    ignore=ignore_rule)
-                else:
-                    shutil.copy2(src, dst)
-
-    def _save_local_storage(self):
-        with open(self._cookies_path, 'w+') as f:
-            f.write(json.dumps(self.driver.execute_script('return window.localStorage;')))  # get local storage
-
     @staticmethod
     def retry(func, *args, **kwargs):
         time.sleep(.5)
@@ -217,23 +189,8 @@ class Driver(object):
     def get(self, url):
         return self.driver.get(url)
 
-    def add_css_selectors(self, selectors: dict):
-        self.CSS_SELECTORS.update(selectors)
-
-    def add_xpath_selectors(self, selectors: dict):
-        self.XPATH_SELECTORS.update(selectors)
-
-    def maximize_window(self):
-        self.driver.maximize_window()
-
-    def screenshot(self, filename):
-        self.driver.save_screenshot(filename)
-
     def refresh(self):
         self.driver.refresh()
-
-    def close(self):
-        self.driver.close()
 
     def quit(self):
         self.driver.quit()
