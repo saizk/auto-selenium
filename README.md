@@ -55,18 +55,10 @@ class TwitterBot(autoselenium.Driver):
         super().__init__(*args, **kwargs)
         self.logged = False
     
-    def login_required(func):
-        def logged_checker(self, *args, **kwargs):
-            if not self.logged:
-                self.log()
-            return func(self, *args, **kwargs)
-        return logged_checker    
-    
     def log(self):
         self.logged = True
         pass
     
-    @login_required
     def scrape(self):
         pass
 ```
