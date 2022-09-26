@@ -20,19 +20,18 @@ pip install auto-selenium
 ```Python
 from autoselenium import Driver
 
-driver = Driver('chrome')
+driver = Driver('chrome')  # downloads driver based on current version of the browser
 driver.get('https://www.google.com/')
 ```
 
 ### Context Manager
 ```Python
-with Driver('brave', root='drivers') as driver:
+with Driver('brave', root='drivers') as driver:  # equivalent to Selenium's WebDriver object
     driver.get('https://www.github.com/saizk')
     # Selenium Webdriver command examples
     driver.find_elements_by_tag_name('div')
     driver.refresh()
 ```
-Downloads driver based on current version of the browser. When it is used as a context manager, the driver returns Selenium's WebDriver object.
 
 ### Download specific versions of each driver
 ```Python
