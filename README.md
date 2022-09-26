@@ -20,8 +20,14 @@ pip install auto-selenium
 ```Python
 from autoselenium import Driver
 
-with Driver('chrome', root='drivers') as driver:
-    driver.get('https://www.google.com/')
+driver = Driver('chrome')
+driver.get('https://www.google.com/')
+```
+
+### Context Manager
+```Python
+with Driver('brave', root='drivers') as driver:
+    driver.get('https://www.github.com/saizk')
     # Selenium Webdriver command examples
     driver.find_elements_by_tag_name('div')
     driver.refresh()
