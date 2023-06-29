@@ -4,8 +4,7 @@ import time
 from sys import platform
 from pathlib import Path
 
-from selenium.webdriver import Chrome, Firefox, Opera, Remote
-from msedge.selenium_tools import Edge
+from selenium.webdriver import Chrome, Firefox, Edge, Remote#, Opera
 
 from selenium.common.exceptions import SessionNotCreatedException
 
@@ -56,7 +55,7 @@ class Driver(object):
             driver_path = self._search_driver(self.browser, root)
             if not driver_path:
                 driver_path = self._download_driver(self.browser, root=root)
-        self.driver_path = Path(driver_path).absolute()
+        self.driver_path = (Path(driver_path).absolute())
 
         if not profile_path:
             profile_path = f'{self.driver_path.parent}/{self.browser}-profile'
@@ -101,28 +100,20 @@ class Driver(object):
             driver = Remote(command_executor=self.command_executor, options=options)
 
         elif self.browser in ['chrome', 'brave']:
-            driver = Chrome(executable_path=self.driver_path, options=options)
+            from selenium.webdriver.chrome.service import Service as ChromeService
+            driver = Chrome(service=ChromeService(str(self.driver_path)), options=options)
 
-        elif self.browser == 'opera':
-            driver = Opera(executable_path=self.driver_path, options=options)
+        # elif self.browser == 'opera':
+        #     driver = Opera(executable_path=self.driver_path, options=options)
 
         elif self.browser == 'edge':
-            driver = Edge(executable_path=self.driver_path, options=options)
+            from selenium.webdriver.edge.service import Service as EdgeService
+            driver = Edge(service=EdgeService(str(self.driver_path)), options=options)
 
         elif self.browser == 'firefox':
-            from selenium.webdriver.firefox.options import FirefoxProfile
+            from selenium.webdriver.firefox.service import Service as FirefoxService
+            driver = Firefox(service=FirefoxService(str(self.driver_path)), options=options)
 
-            if self.profile_path.exists():
-                profile = FirefoxProfile(self.profile_path)
-            else:
-                profile = FirefoxProfile()
-
-            driver = Firefox(
-                executable_path=self.driver_path,
-                options=options,
-                firefox_profile=profile,
-                service_log_path=Path(f'{self.driver_path.parent}/geckodriver.log')
-            )
         else:
             raise RuntimeError(f'Cannot load Selenium driver for {self.browser}')
 
@@ -141,14 +132,16 @@ class Driver(object):
             options = FirefoxOptions()
             options.set_preference('dom.webnotifications.enabled', False)
 
-        elif self.browser == 'opera':
-            from selenium.webdriver.opera.options import Options as OperaOptions
-            options = OperaOptions()
+        # elif self.browser == 'opera':
+        #     from selenium.webdriver.opera.options import Options as OperaOptions
+        #     options = OperaOptions()
 
         elif self.browser == 'edge':
             from msedge.selenium_tools import EdgeOptions
             options = EdgeOptions()
             options.use_chromium = True
+            options._ignore_local_proxy = True
+
         else:
             raise RuntimeError(f'Unknown browser {self.browser}')
 
@@ -182,8 +175,8 @@ class Driver(object):
         return options
 
     @staticmethod
-    def retry(func, *args, **kwargs):
-        time.sleep(.5)
+    def retry(func, sleep=0.5, *args, **kwargs):
+        time.sleep(sleep)
         func(*args, **kwargs)
 
     def get(self, url):

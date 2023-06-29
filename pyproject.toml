@@ -2,7 +2,6 @@
 requires = [
     "setuptools>=42",
     "wheel",
-    "Jinja2>=3.0.2",
     "selenium>=3.141.0",
     "msedge-selenium-tools>=3.141.3"
 ]

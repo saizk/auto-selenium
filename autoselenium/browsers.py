@@ -99,7 +99,7 @@ def get_linux_default_browser():
         if default_browser == 'google':
             default_browser = 'chrome'
 
-    except Exception:
+    except Exception as e:
         return 'firefox'  # linux default
 
     return default_browser

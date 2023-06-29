@@ -14,8 +14,8 @@ def download_driver(driver, version='current', root='.'):
     if not os.path.exists(root):
         os.mkdir(root)
 
-    driver_folder = f'{root}/{driver}'
-    driver_path = driver_folder + f'/{driver}driver' + ('.exe' if platform == 'win32' else '')
+    driver_name = get_driver_name(driver)
+    driver_path = root + f'/{driver_name}driver' + ('.exe' if platform == 'win32' else '')
     driver_path = Path(driver_path).absolute()
 
     if driver_path.exists():
@@ -24,9 +24,9 @@ def download_driver(driver, version='current', root='.'):
         version = get_version(driver, version)
         url, filename = gen_url(driver, version)
         download_url(url, filename)
-        extract(filename, driver_folder)
+        extract(filename, root)
         fix_paths(driver, driver_path)
-        assert driver_path.exists()
+        assert driver_path.exists(), driver_path
 
     except (HTTPError, URLError):
         raise RuntimeError(f'Cannot download {driver} driver.\n'
@@ -44,8 +44,7 @@ def get_version(driver, version):
         return get_latest_version(driver)
     elif version == 'current':
         return get_current_version(driver)
-    else:
-        return parse_version(driver, version)
+    return parse_version(driver, version)
 
 
 def parse_version(driver, raw_version):
@@ -54,8 +53,7 @@ def parse_version(driver, raw_version):
         return 'v' + raw_version
     elif driver == 'opera':
         return 'v.' + raw_version
-    else:
-        return raw_version
+    return raw_version
 
 
 def download_url(url, filename):
@@ -69,15 +67,16 @@ def extract(filename, tgt_path):
 
 
 def fix_paths(driver, driver_path):
-    src_path = search_driver(root=driver_path.parent)
-    if driver in ['firefox', 'brave', 'edge']:
-        os.rename(src_path, driver_path)      # rename for convenience
-        if driver == 'edge':
-            shutil.rmtree(f'{driver_path.parent}/Driver_Notes')
+    if driver in ['chrome', 'brave']:
+        os.remove(driver_path.parent / 'LICENSE.chromedriver')
 
     elif driver == 'opera':
+        src_path = search_driver(browser=driver, root=driver_path.parent)
         shutil.move(src_path, driver_path)  # moves driver and deletes extra dir
         shutil.rmtree(src_path.parent)
+
+    elif driver == 'edge':
+        shutil.rmtree(driver_path.parent / 'Driver_Notes')
 
     if platform in ['linux', 'darwin'] and driver in ['chrome', 'opera', 'brave']:
         os.chmod(driver_path, 755)  # add permissions for linux/mac drivers
