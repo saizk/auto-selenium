@@ -1,54 +1,50 @@
 # -*- coding: utf-8 -*-
 
 from sys import platform
+from platform import machine
 from pathlib import Path
+from jinja2 import Template
 
 import autoselenium.browsers as brw
 
 
 DRIVER_URLS = {
-    'chrome': 'https://chromedriver.storage.googleapis.com',
-    'firefox': 'https://github.com/mozilla/geckodriver/releases/download',
-    'opera': 'https://github.com/operasoftware/operachromiumdriver/releases/download',
-    'edge': 'https://msedgedriver.azureedge.net',
-    'brave': 'https://chromedriver.storage.googleapis.com',
+    'chrome': 'https://chromedriver.storage.googleapis.com/{{version}}/chromedriver_{{os}}{{bits}}.{{format}}',
+    'chrome-for-testing': 'https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/{{version}}/{{os}}{{bits}}/chromedriver-{{os}}{{bits}}.zip',
+    'firefox': 'https://github.com/mozilla/geckodriver/releases/download/{{version}}/geckodriver-{{version}}-{{os}}{{bits}}.{{format}}',
+    'opera': 'https://github.com/operasoftware/operachromiumdriver/releases/download/{{version}}/operadriver_{{os}}{{bits}}.{{format}}',
+    'edge': 'https://msedgedriver.azureedge.net/{{version}}/edgedriver_{{os}}{{bits}}.{{format}}',
+    # 'edge': 'https://msedgedriver.azureedge.net/{{version}}/edgedriver_win{{bits}}.{{format}}'
 }
-
-
-def get_driver_name(driver):
-    if driver == 'firefox':
-        return 'gecko'
-    elif driver == 'brave':
-        return 'chrome'
-    elif driver == 'edge':
-        return 'msedge'
-    return driver
-
-
-def gen_driver_url(driver, version, os, bits, format_):
-    root = DRIVER_URLS[driver]
-    if driver == 'chrome' or driver == 'brave':
-        return f'{root}/{version}/chromedriver_{os}{bits}.{format_}'
-    elif driver == 'firefox':
-        return f'{root}/{version}/geckodriver-{version}-{os}{bits}.{format_}'
-    elif driver == 'opera':
-        return f'{root}/{version}/operadriver_{os}{bits}.{format_}'
-    elif driver == 'edge':
-        return f'{root}/{version}/edgedriver_{os}{bits}.{format_}'
+DRIVER_URLS['brave'] = DRIVER_URLS['chrome']
 
 
 def gen_url(driver, version):
-    bits = 64
+
     if platform == 'win32' and driver in ['chrome', 'brave']:
         bits = 32
     elif platform == 'darwin' and driver == 'firefox':
         bits = 'os'
+    else:
+        bits = 64
 
-    file_ext = 'zip'
     if platform in ['linux', 'darwin'] and driver == 'firefox':
         file_ext = 'tar.gz'
+    else:
+        file_ext = 'zip'
+    
+    if version.endswith('-chrome-for-testing'):
+        driver = 'chrome-for-testing'
+        version = version.replace('-chrome-for-testing', '')
+        if platform == 'win32':
+            bits = 64 if machine().endswith('64') else 32
+        elif platform == 'darwin':
+            bits = '-x64' if machine() == 'x86_64' else '-arm64'
+        else:
+            bits = 64
 
-    url = gen_driver_url(driver, version, get_os(), bits, file_ext)
+    template = Template(DRIVER_URLS[driver])
+    url = template.render(version=version, os=get_os(), bits=bits, format=file_ext)
     filename = url.split('/')[-1]
     return url, filename
 
@@ -78,9 +74,8 @@ def get_current_version(browser):
 
 
 def search_driver(browser='*', root='.'):
-    driver_name = get_driver_name(browser)
     ext = '.exe' if platform == 'win32' else ''
-    for path in Path(root).rglob(f'{driver_name}driver{ext}'):
+    for path in Path(root).rglob(f'{browser}driver{ext}'):
         return path.absolute()
 
 
@@ -89,7 +84,8 @@ def get_os():
         return 'win'
     elif platform == 'darwin':
         return 'mac'
-    return platform  # linux
+    else:
+        return platform  # linux
 
 
 def get_os_default_browser():

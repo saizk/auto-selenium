@@ -2,12 +2,14 @@
 
 import json
 import urllib.request
+from urllib.error import HTTPError, URLError
 import subprocess
 from sys import platform
 
 
 LATEST_RELEASES = {
     'chrome': 'https://chromedriver.storage.googleapis.com/LATEST_RELEASE',
+    'chrome-for-testing': 'https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json',
     'firefox': 'https://api.github.com/repos/mozilla/geckodriver/releases/latest',
     'opera': 'https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest',
     'edge': 'https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/'
@@ -36,8 +38,19 @@ def get_chromium_latest_release(driver, current_version=False):
         version = get_browser_version(driver)
         api_path += f'_{version.split(".")[0]}' if version else ''
 
-    with urllib.request.urlopen(api_path) as response:
-        version = response.readlines()[0].decode('utf-8')
+    try:
+        with urllib.request.urlopen(api_path) as response:
+            version = response.readlines()[0].decode('utf-8')
+    except (HTTPError, URLError):
+        api_path = LATEST_RELEASES['chrome-for-testing']
+
+        with urllib.request.urlopen(api_path) as response:
+            api_json = json.loads(response.read().decode(response.headers.get_content_charset()))
+        for channel in api_json['channels'].values():
+            if version.split('.')[0] == channel['version'].split('.')[0]:
+                version = channel['version'] + '-chrome-for-testing'
+                break
+                
 
     return version
 
@@ -99,7 +112,7 @@ def get_linux_default_browser():
         if default_browser == 'google':
             default_browser = 'chrome'
 
-    except Exception as e:
+    except Exception:
         return 'firefox'  # linux default
 
     return default_browser
